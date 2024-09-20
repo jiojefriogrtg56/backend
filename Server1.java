@@ -20,22 +20,35 @@ public class Server {
     static class DataHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            try (InputStream requestBody = exchange.getRequestBody();
-                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("Access-Control-Request-Method", "*");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "*");
+            String method = exchange.getRequestMethod();
+            if ("POST".equals(method)) {
+                try (InputStream requestBody = exchange.getRequestBody();
+                     ByteArrayOutputStream output = new ByteArrayOutputStream()) {
 
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = requestBody.read(buffer)) != -1) {
-                    output.write(buffer, 0, bytesRead);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = requestBody.read(buffer)) != -1) {
+                        output.write(buffer, 0, bytesRead);
+                    }
+
+                    String text = output.toString();
+
+                    Files.write(Paths.get("data.txt"), text.getBytes());
+
+                    exchange.sendResponseHeaders(200, -1);
+                    OutputStream outputStream = exchange.getResponseBody();
+                    outputStream.close();
                 }
-
-                String text = output.toString();
-
-                Files.write(Paths.get("data.txt"), text.getBytes());
-
-                exchange.sendResponseHeaders(200, -1);
-                OutputStream outputStream = exchange.getResponseBody();
-                outputStream.close();
+            } else if ("GET".equals(method)) {
+                String data = new String(Files.readAllBytes(Paths.get("data.txt")));
+                exchange.sendResponseHeaders(200, data.getBytes().length);
+                try (OutputStream responseBody = exchange.getResponseBody()) {
+                    responseBody.write(data.getBytes());
+                }
             }
         }
     }
